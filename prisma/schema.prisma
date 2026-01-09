@@ -1,0 +1,729 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlserver"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  passwordHash  String
+  firstName     String?
+  lastName      String?
+  dateOfBirth   DateTime?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  roles         UserRole[]
+  auditLogs     AuditLog[]
+  notifications Notification[]
+  payments      Payment[]
+  orders        Order[]
+  parent        Parent?
+  refreshTokens RefreshToken[]
+  parentConsentsAsStudent ParentConsent[] @relation("Student")
+  parentConsentsAsParent ParentConsent[] @relation("Parent")
+  projectAssignments ProjectAssignment[]
+  projectSubmissions ProjectSubmission[]
+  reviewedSubmissions ProjectSubmission[] @relation("SubmissionReviewer")
+  rubricEvaluations RubricEvaluation[] @relation("RubricEvaluator")
+  studentSkills StudentSkill[]
+  endorsedSkills StudentSkill[] @relation("SkillEndorser")
+  badges        Badge[]
+
+  @@index([email])
+  @@index([isActive])
+  @@map("users")
+}
+
+model Role {
+  id          String    @id @default(uuid())
+  name        String    @unique
+  description String?
+  permissions Json      @default("[]")
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  users       UserRole[]
+
+  @@index([name])
+  @@index([isActive])
+  @@map("roles")
+}
+
+model UserRole {
+  id        String   @id @default(uuid())
+  userId    String
+  roleId    String
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+  @@index([userId])
+  @@index([roleId])
+  @@map("user_roles")
+}
+
+model School {
+  id          String    @id @default(uuid())
+  name        String
+  code        String    @unique
+  address     String?
+  city        String?
+  state       String?
+  country     String?
+  postalCode  String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  classes     Class[]
+  curriculumSelections SchoolCurriculumSelection[]
+  subscriptions Subscription[]
+  orders      Order[]
+
+  @@index([code])
+  @@index([isActive])
+  @@map("schools")
+}
+
+model Class {
+  id          String    @id @default(uuid())
+  schoolId    String
+  name        String
+  code        String
+  grade       String?
+  academicYear String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  school      School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, code])
+  @@index([schoolId])
+  @@index([isActive])
+  @@map("classes")
+}
+
+model Curriculum {
+  id          String    @id @default(uuid())
+  name        String
+  description String?
+  version     String
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  grades      Grade[]
+  schoolSelections SchoolCurriculumSelection[]
+
+  @@unique([name, version])
+  @@index([isActive])
+  @@index([version])
+  @@map("curricula")
+}
+
+model Grade {
+  id            String    @id @default(uuid())
+  curriculumId  String
+  name          String
+  level         Int       // e.g., 1, 2, 3 for Grade 1, 2, 3
+  description   String?
+  order         Int       @default(0)
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  curriculum    Curriculum @relation(fields: [curriculumId], references: [id], onDelete: Cascade)
+  subjects      Subject[]
+
+  @@unique([curriculumId, level])
+  @@index([curriculumId])
+  @@index([isActive])
+  @@map("grades")
+}
+
+model Subject {
+  id            String    @id @default(uuid())
+  gradeId       String
+  name          String
+  code          String?   // e.g., MATH, ENG, SCI
+  description   String?
+  order         Int       @default(0)
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  grade         Grade     @relation(fields: [gradeId], references: [id], onDelete: Cascade)
+  chapters      Chapter[]
+
+  @@unique([gradeId, code])
+  @@index([gradeId])
+  @@index([isActive])
+  @@map("subjects")
+}
+
+model Chapter {
+  id            String    @id @default(uuid())
+  subjectId     String
+  name          String
+  number        Int?      // Chapter number
+  description   String?
+  order         Int       @default(0)
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  subject       Subject   @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  concepts      Concept[]
+
+  @@index([subjectId])
+  @@index([isActive])
+  @@map("chapters")
+}
+
+model Concept {
+  id            String    @id @default(uuid())
+  chapterId     String
+  name          String
+  description   String?
+  learningObjectives Json? // Array of learning objectives
+  order         Int       @default(0)
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  chapter       Chapter   @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+
+  @@index([chapterId])
+  @@index([isActive])
+  @@map("concepts")
+}
+
+model SchoolCurriculumSelection {
+  id            String    @id @default(uuid())
+  schoolId      String
+  curriculumId String
+  isActive      Boolean   @default(true)
+  selectedAt    DateTime  @default(now())
+  selectedBy    String?   // User ID who selected it
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  school        School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  curriculum    Curriculum @relation(fields: [curriculumId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, curriculumId])
+  @@index([schoolId])
+  @@index([curriculumId])
+  @@index([isActive])
+  @@map("school_curriculum_selections")
+}
+
+model Project {
+  id          String    @id @default(uuid())
+  name        String
+  description String?
+  status      String    @default("draft")
+  startDate   DateTime?
+  endDate     DateTime?
+  templateId  String?   // Link to template if created from template
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  template    ProjectTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  assignments ProjectAssignment[]
+  submissions ProjectSubmission[]
+  studentSkills StudentSkill[]
+  portfolioItems PortfolioItem[]
+
+  @@index([status])
+  @@index([isActive])
+  @@index([templateId])
+  @@map("projects")
+}
+
+model ProjectTemplate {
+  id            String    @id @default(uuid())
+  title         String
+  description   String?
+  category      String    // AI, Robotics, Web, Data
+  rubric        Json?     // Optional rubric as JSON
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  skills        ProjectTemplateSkill[]
+  projects      Project[]
+
+  @@index([category])
+  @@index([isActive])
+  @@map("project_templates")
+}
+
+model ProjectTemplateSkill {
+  id            String    @id @default(uuid())
+  templateId    String
+  skillId       String
+  requiredLevel Int?      // Optional required skill level
+  createdAt     DateTime  @default(now())
+
+  template      ProjectTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  skill         Skill           @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, skillId])
+  @@index([templateId])
+  @@index([skillId])
+  @@map("project_template_skills")
+}
+
+model Skill {
+  id          String    @id @default(uuid())
+  name        String    @unique
+  category    String?
+  description String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  studentSkills StudentSkill[]
+  templateSkills ProjectTemplateSkill[]
+
+  @@index([name])
+  @@index([category])
+  @@index([isActive])
+  @@map("skills")
+}
+
+model Parent {
+  id          String    @id @default(uuid())
+  userId      String    @unique
+  phoneNumber String?
+  address     String?
+  city        String?
+  state       String?
+  country     String?
+  postalCode  String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isActive])
+  @@map("parents")
+}
+
+model ParentConsent {
+  id            String    @id @default(uuid())
+  studentId     String
+  parentId      String
+  status        String    @default("pending")
+  consentGiven  Boolean   @default(false)
+  consentDate   DateTime?
+  revokedDate   DateTime?
+  invitationToken String  @unique
+  invitedAt     DateTime  @default(now())
+  expiresAt     DateTime
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  student       User      @relation("Student", fields: [studentId], references: [id], onDelete: Cascade)
+  parent        User      @relation("Parent", fields: [parentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, parentId])
+  @@index([studentId])
+  @@index([parentId])
+  @@index([status])
+  @@index([invitationToken])
+  @@index([expiresAt])
+  @@map("parent_consents")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  title     String
+  message   String
+  type      String   @default("info")
+  isRead    Boolean  @default(false)
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  twilioNotifications TwilioNotification[]
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+model TwilioNotification {
+  id                String    @id @default(uuid())
+  notificationId    String
+  channel           String    // sms, whatsapp
+  recipientPhone    String
+  message           String
+  twilioMessageId   String?   @unique
+  twilioStatus      String?   // queued, sent, delivered, failed, undelivered
+  status            String    @default("pending") // pending, sent, delivered, failed, retrying
+  retryCount        Int       @default(0)
+  maxRetries        Int       @default(3)
+  errorMessage      String?
+  sentAt            DateTime?
+  deliveredAt       DateTime?
+  failedAt          DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  notification      Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@index([notificationId])
+  @@index([twilioMessageId])
+  @@index([status])
+  @@index([channel])
+  @@index([createdAt])
+  @@map("twilio_notifications")
+}
+
+model Payment {
+  id            String    @id @default(uuid())
+  userId        String
+  amount        Decimal
+  currency      String    @default("USD")
+  status        String    @default("pending")
+  paymentMethod String?
+  transactionId String?   @unique
+  metadata      Json?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order         Order?    @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  orderId      String?
+
+  @@index([userId])
+  @@index([status])
+  @@index([transactionId])
+  @@index([createdAt])
+  @@index([orderId])
+  @@map("payments")
+}
+
+model Order {
+  id                String    @id @default(uuid())
+  razorpayOrderId   String    @unique
+  schoolId          String?
+  userId            String?   // For kit/program payments (non-student)
+  orderType         String    // subscription, kit, program
+  amount            Decimal
+  currency          String    @default("INR")
+  status            String    @default("created") // created, attempted, paid, failed, cancelled
+  description       String?
+  notes             String?
+  razorpayPaymentId String?
+  razorpaySignature String?
+  metadata          Json?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  paidAt            DateTime?
+
+  school            School?   @relation(fields: [schoolId], references: [id], onDelete: SetNull)
+  user              User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  payments          Payment[]
+  subscription      Subscription?
+
+  @@index([razorpayOrderId])
+  @@index([schoolId])
+  @@index([userId])
+  @@index([status])
+  @@index([orderType])
+  @@index([createdAt])
+  @@map("orders")
+}
+
+model Subscription {
+  id                String    @id @default(uuid())
+  schoolId          String    @unique
+  orderId           String    @unique
+  razorpayPlanId    String?
+  razorpaySubscriptionId String? @unique
+  planName           String
+  planType           String    // monthly, quarterly, yearly
+  amount             Decimal
+  currency           String    @default("INR")
+  status             String    @default("active") // active, cancelled, expired, past_due
+  startDate          DateTime
+  endDate            DateTime?
+  nextBillingDate    DateTime?
+  cancelledAt        DateTime?
+  cancellationReason String?
+  metadata           Json?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  school             School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  order              Order     @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  @@index([schoolId])
+  @@index([orderId])
+  @@index([status])
+  @@index([razorpaySubscriptionId])
+  @@index([nextBillingDate])
+  @@map("subscriptions")
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  userId      String?
+  action      String
+  entity      String
+  entityId    String?
+  changes     Json?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([entity, entityId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model ProjectAssignment {
+  id          String    @id @default(uuid())
+  projectId   String
+  studentId   String
+  assignedBy  String?
+  assignedAt  DateTime  @default(now())
+  dueDate     DateTime?
+  status      String    @default("assigned")
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  student     User      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  submissions ProjectSubmission[]
+
+  @@unique([projectId, studentId])
+  @@index([studentId])
+  @@index([projectId])
+  @@index([status])
+  @@index([dueDate])
+  @@map("project_assignments")
+}
+
+model ProjectSubmission {
+  id            String    @id @default(uuid())
+  projectId     String
+  studentId     String
+  assignmentId String?
+  status        String    @default("draft") // draft, submitted, under_review, approved, rejected, graded, returned
+  submittedAt   DateTime?
+  grade         Decimal?
+  feedback      String?
+  submittedData Json?
+  reviewedBy    String?   // Teacher who reviewed
+  reviewedAt    DateTime?
+  reviewStatus  String?   // approved, rejected
+  reviewComment String?   // Mandatory on rejection
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  student       User      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  assignment    ProjectAssignment? @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
+  reviewer      User?     @relation("SubmissionReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  studentSkills StudentSkill[]
+  media         SubmissionMedia[]
+  portfolioItem PortfolioItem?
+  rubricEvaluation RubricEvaluation?
+
+  @@index([studentId])
+  @@index([projectId])
+  @@index([status])
+  @@index([submittedAt])
+  @@index([reviewStatus])
+  @@index([reviewedBy])
+  @@map("project_submissions")
+}
+
+model RubricEvaluation {
+  id            String    @id @default(uuid())
+  submissionId  String    @unique
+  rubric        Json      // The rubric template used
+  scores        Json?     // Scores for each criterion (optional)
+  comments      Json?     // Comments for each criterion
+  overallScore  Decimal? // Total/aggregated score (optional)
+  overallComment String? // Overall evaluation comment
+  evaluatedBy   String
+  evaluatedAt   DateTime  @default(now())
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  submission    ProjectSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  evaluator     User      @relation("RubricEvaluator", fields: [evaluatedBy], references: [id], onDelete: Restrict)
+
+  @@index([submissionId])
+  @@index([evaluatedBy])
+  @@index([evaluatedAt])
+  @@map("rubric_evaluations")
+}
+
+model SubmissionMedia {
+  id            String    @id @default(uuid())
+  submissionId  String
+  fileName      String
+  originalName  String
+  mimeType      String
+  fileSize      Int       // Size in bytes
+  blobPath      String    // Path in Azure Blob Storage
+  blobContainer String    // Container name
+  mediaType     String    // image, video, document
+  uploadedAt    DateTime  @default(now())
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  submission    ProjectSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@index([submissionId])
+  @@index([mediaType])
+  @@map("submission_media")
+}
+
+model StudentSkill {
+  id                String    @id @default(uuid())
+  studentId         String
+  skillId           String
+  level             Int       @default(1)
+  progress          Decimal   @default(0)
+  projectId         String
+  submissionId      String
+  endorsedBy        String
+  endorsementDate   DateTime  @default(now())
+  lastUpdated       DateTime  @default(now())
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  student           User      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  skill             Skill     @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  project           Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  submission        ProjectSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  endorser          User      @relation("SkillEndorser", fields: [endorsedBy], references: [id], onDelete: Restrict)
+
+  @@unique([studentId, skillId])
+  @@index([studentId])
+  @@index([skillId])
+  @@index([projectId])
+  @@index([submissionId])
+  @@index([level])
+  @@map("student_skills")
+}
+
+model Badge {
+  id          String    @id @default(uuid())
+  studentId   String
+  name        String
+  description String?
+  category    String?
+  icon        String?
+  earnedAt    DateTime  @default(now())
+  metadata    Json?
+  createdAt   DateTime  @default(now())
+
+  student     User      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId])
+  @@index([category])
+  @@index([earnedAt])
+  @@map("badges")
+}
+
+model PortfolioItem {
+  id            String    @id @default(uuid())
+  studentId     String
+  submissionId  String    @unique
+  projectId     String
+  title         String
+  description   String?
+  category      String    // AI, Robotics, Web, Data (from project template)
+  isPublic      Boolean   @default(false) // Public showcase (future use)
+  parentConsent Boolean   @default(false) // Parent consent for showcase
+  schoolConsent Boolean   @default(false) // School consent for showcase
+  featured      Boolean   @default(false) // Featured in portfolio
+  showcaseOrder Int?      // Order in showcase view
+  metadata      Json?     // Additional showcase data
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  student       User      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  submission    ProjectSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([studentId])
+  @@index([projectId])
+  @@index([category])
+  @@index([isPublic])
+  @@index([parentConsent])
+  @@index([schoolConsent])
+  @@index([featured])
+  @@map("portfolio_items")
+}
+
+model PortfolioSettings {
+  id            String    @id @default(uuid())
+  studentId     String?   // Null for school-level settings
+  schoolId      String?   // Null for student-level settings
+  allowPublicShowcase Boolean @default(false)
+  requireParentConsent Boolean @default(true)
+  requireSchoolConsent Boolean @default(true)
+  autoAddApprovedProjects Boolean @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  student       User?     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  school        School?   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId])
+  @@unique([schoolId])
+  @@index([studentId])
+  @@index([schoolId])
+  @@map("portfolio_settings")
+}
+
